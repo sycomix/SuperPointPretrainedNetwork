@@ -195,7 +195,7 @@ class SuperPointFrontend(object):
     grid = np.pad(grid, ((pad,pad), (pad,pad)), mode='constant')
     # Iterate through points, highest to lowest conf, suppress neighborhood.
     count = 0
-    for i, rc in enumerate(rcorners.T):
+    for rc in rcorners.T:
       # Account for top and left padding.
       pt = (rc[0]+pad, rc[1]+pad)
       if grid[pt[1], pt[0]] == 1: # If not yet suppressed.
@@ -299,8 +299,7 @@ class PointTracker(object):
     self.maxl = max_length
     self.nn_thresh = nn_thresh
     self.all_pts = []
-    for n in range(self.maxl):
-      self.all_pts.append(np.zeros((2, 0)))
+    self.all_pts.extend(np.zeros((2, 0)) for _ in range(self.maxl))
     self.last_desc = None
     self.tracks = np.zeros((0, self.maxl+2))
     self.track_count = 0
@@ -358,10 +357,8 @@ class PointTracker(object):
       offsets - N length array with integer offset locations.
     """
     # Compute id offsets.
-    offsets = []
-    offsets.append(0)
-    for i in range(len(self.all_pts)-1): # Skip last camera size, not needed.
-      offsets.append(self.all_pts[i].shape[1])
+    offsets = [0]
+    offsets.extend(self.all_pts[i].shape[1] for i in range(len(self.all_pts)-1))
     offsets = np.array(offsets)
     offsets = np.cumsum(offsets)
     return offsets
@@ -448,8 +445,7 @@ class PointTracker(object):
     # Remove tracks which do not have an observation in most recent frame.
     not_headless = (self.tracks[:, -1] != -1)
     keepers = np.logical_and.reduce((valid, good_len, not_headless))
-    returned_tracks = self.tracks[keepers, :].copy()
-    return returned_tracks
+    return self.tracks[keepers, :].copy()
 
   def draw_tracks(self, out, tracks):
     """ Visualize tracks all overlayed on a single image.
@@ -500,7 +496,7 @@ class VideoStreamer(object):
     self.skip = skip
     self.maxlen = 1000000
     # If the "basedir" string is the word camera, then use a webcam.
-    if basedir == "camera/" or basedir == "camera":
+    if basedir in ["camera/", "camera"]:
       print('==> Processing Webcam Input.')
       self.cap = cv2.VideoCapture(camid)
       self.listing = range(0, self.maxlen)
@@ -508,7 +504,7 @@ class VideoStreamer(object):
     else:
       # Try to open as a video.
       self.cap = cv2.VideoCapture(basedir)
-      lastbit = basedir[-4:len(basedir)]
+      lastbit = basedir[-4:]
       if (type(self.cap) == list or not self.cap.isOpened()) and (lastbit == '.mp4'):
         raise IOError('Cannot open movie file')
       elif type(self.cap) != list and self.cap.isOpened() and (lastbit != '.txt'):
@@ -539,7 +535,7 @@ class VideoStreamer(object):
     """
     grayim = cv2.imread(impath, 0)
     if grayim is None:
-      raise Exception('Error reading image %s' % impath)
+      raise Exception(f'Error reading image {impath}')
     # Image is resized via opencv.
     interp = cv2.INTER_AREA
     grayim = cv2.resize(grayim, (img_size[1], img_size[0]), interpolation=interp)
@@ -649,7 +645,7 @@ if __name__ == '__main__':
 
   # Create output directory if desired.
   if opt.write:
-    print('==> Will write outputs to %s' % opt.write_dir)
+    print(f'==> Will write outputs to {opt.write_dir}')
     if not os.path.exists(opt.write_dir):
       os.makedirs(opt.write_dir)
 
@@ -718,7 +714,7 @@ if __name__ == '__main__':
     # Optionally write images to disk.
     if opt.write:
       out_file = os.path.join(opt.write_dir, 'frame_%05d.png' % vs.i)
-      print('Writing image to %s' % out_file)
+      print(f'Writing image to {out_file}')
       cv2.imwrite(out_file, out)
 
     end = time.time()
